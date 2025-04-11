@@ -1,10 +1,17 @@
 
 #include <netinet/in.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/socket.h>
 
 #define TRUE 1
+
+void *handle_client(void *client_fd) {
+  void *p;
+
+  return p;
+}
 
 int main(int argc, char *argv[]) {
   int server_fd;
@@ -37,9 +44,22 @@ int main(int argc, char *argv[]) {
   }
 
   while (TRUE) {
+    // client info
     struct sockaddr_in client_addr;
     socklen_t client_addr_len = sizeof(client_addr);
     int *client_fd = malloc(sizeof(int));
+
+    // accept client connection
+    if (connect(*client_fd, (struct sockaddr *)&client_addr,
+                sizeof(client_addr)) == -1) {
+      perror("fail to accept from client");
+      continue;
+    };
+
+    // create a new thread to handle client request
+    pthread_t thread_id;
+    pthread_create(&thread_id, NULL, handle_client, (void *)client_fd);
+    pthread_detach(thread_id);
   }
 
   return 0;
