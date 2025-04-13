@@ -1,5 +1,6 @@
 
 #include <ctype.h>
+#include <fcntl.h>
 #include <netinet/in.h>
 #include <pthread.h>
 #include <regex.h>
@@ -8,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 #define TRUE 1
@@ -40,6 +42,7 @@ char *url_decode(const char *src) {
 }
 
 const char *get_file_extension(const char *file_name) {
+
   const char *dot = strrchr(file_name, '.');
   if (dot == NULL || dot == file_name) {
     return "";
@@ -47,8 +50,57 @@ const char *get_file_extension(const char *file_name) {
   return dot + 1;
 }
 
+const char *get_mime_type(const char *file_ext) {
+  if (strcasecmp(file_ext, "html") == 0 || strcasecmp(file_ext, "htm") == 0) {
+    return "text/html";
+  } else if (strcasecmp(file_ext, "txt") == 0) {
+    return "text/plain";
+  } else if (strcasecmp(file_ext, "jpg") == 0 ||
+             strcasecmp(file_ext, "jpeg") == 0) {
+    return "image/jpeg";
+  } else if (strcasecmp(file_ext, "png") == 0) {
+    return "image/png";
+  } else {
+    return "application/octet-stream";
+  }
+}
+
 void build_http_response(const char *file_name, const char *file_ext,
-                         char *response, size_t *response_len) {}
+                         char *response, size_t *response_len) {
+  const char *mime_type = get_mime_type(file_ext);
+  char *header = (char *)malloc(BUFF_SIZE * sizeof(char));
+  snprintf(header, BUFF_SIZE,
+           "HTTP/1.1 200 OK\r\n"
+           "Content-Type: %s\r\n"
+           "\r\n",
+           mime_type);
+
+  int file_fd = open(file_name, O_RDONLY);
+  if (file_fd == -1) {
+    snprintf(response, BUFF_SIZE,
+             "HTTP/1.1 404 Not Found\r\n"
+             "Content-Type: text/plain\r\n"
+             "\r\n"
+             "404 Not Found");
+    *response_len = strlen(response);
+    return;
+  }
+  struct stat file_stat;
+  fstat(file_fd, &file_stat);
+  off_t file_size = file_stat.st_size;
+
+  *response_len = 0;
+  memcpy(response, header, strlen(header));
+  *response_len += strlen(header);
+
+  ssize_t bytes_read;
+  while ((bytes_read = read(file_fd, response + *response_len,
+                            BUFF_SIZE - *response_len)) > 0) {
+    *response_len += bytes_read;
+  }
+  free(header);
+  close(file_fd);
+}
 
 void *handle_client(void *arg) {
   int client_fd = *(int *)arg;
@@ -81,7 +133,7 @@ void *handle_client(void *arg) {
       build_http_response(file_name, file_ext, response, &response_len);
       send(client_fd, response, response_len, 0);
       free(response);
-      free(file_name);
+      free((void *)file_name);
     }
     regfree(&regex);
   }
