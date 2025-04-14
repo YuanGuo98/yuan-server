@@ -179,9 +179,10 @@ int main(int argc, char *argv[]) {
     socklen_t client_addr_len = sizeof(client_addr);
     int *client_fd = malloc(sizeof(int));
 
+    *client_fd =
+        accept(server_fd, (struct sockaddr *)&client_addr, &client_addr_len);
     // accept client connection
-    if (connect(*client_fd, (struct sockaddr *)&client_addr,
-                sizeof(client_addr)) == -1) {
+    if (*client_fd == -1) {
       perror("fail to accept from client");
       continue;
     };
